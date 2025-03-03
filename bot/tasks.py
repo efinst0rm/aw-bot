@@ -28,19 +28,16 @@ class SteamSaleChecker(commands.Cog):
 
     @tasks.loop(hours=24)
     async def check_steam_sale(self):
-
         for app_id, game_data in COD_GAMES.items():
             game_name = game_data["name"]
             channel_id = game_data["channel"]
-
             channel = self.bot.get_channel(channel_id)
+
             if channel is None:
                 print(f"Error: Channel ID {channel_id} for {game_name} not found.")
                 return
 
-            steam_api_url = (
-                f"https://store.steampowered.com/api/appdetails?appids={app_id}"
-            )
+            steam_api_url = f"https://store.steampowered.com/api/appdetails?appids={app_id}"
 
             try:
                 response = requests.get(steam_api_url)
@@ -51,27 +48,35 @@ class SteamSaleChecker(commands.Cog):
                     return
 
                 price_info = data.get("price_overview", {})
+                header_image = data.get("header_image", None)
+                store_url = f"https://store.steampowered.com/app/{app_id}/"
 
                 if not price_info:
-                    await channel.send(
-                        f"{game_name} is currently unavailable for purchase."
+                    embed = discord.Embed(
+                        title=game_name,
+                        description="This game is currently unavailable for purchase.",
+                        color=discord.Color.red(),
                     )
+                    embed.set_thumbnail(url=header_image if header_image else "")
+                    embed.add_field(name="Steam Store", value=f"[View on Steam]({store_url})", inline=False)
+                    await channel.send(embed=embed)
                     return
 
                 original_price = price_info.get("initial", 0) / 100
                 discounted_price = price_info.get("final", 0) / 100
                 discount_percent = price_info.get("discount_percent", 0)
-                store_url = f"https://store.steampowered.com/app/{app_id}/"
 
                 if discount_percent > 0:
-                    message = (
-                        f"**{game_name} is on sale!**\n"
-                        f"Original Price: **${original_price:.2f}**\n"
-                        f"Discounted Price: **${discounted_price:.2f}** (**-{discount_percent}%**)\n"
-                        f"[View on Steam]({store_url})\n"
+                    embed = discord.Embed(
+                        title=f"{game_name} is on Sale! 🎉",
+                        description=f"🔥 **-{discount_percent}% OFF!** 🔥",
+                        color=discord.Color.green(),
                     )
-
-                    await channel.send(message)
+                    embed.set_thumbnail(url=header_image if header_image else "")
+                    embed.add_field(name="Original Price", value=f"~~${original_price:.2f}~~", inline=True)
+                    embed.add_field(name="Discounted Price", value=f"**${discounted_price:.2f}**", inline=True)
+                    embed.add_field(name="Steam Store", value=f"[View on Steam]({store_url})", inline=False)
+                    await channel.send(embed=embed)
 
             except requests.RequestException as e:
                 print(f"Error fetching Steam sale data for {game_name}: {e}")
